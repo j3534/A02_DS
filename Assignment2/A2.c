@@ -27,12 +27,33 @@ struct Stack {
 };
 
 /*
+* FUNCTION				: initializeStack
+* DESCRIPTION			:
+*	Creates a new stack
+* PARAMETERS			:
+*   None
+* RETURNS				:
+* 	struct Stack*  		: A pointer to the new stack
+*/
+struct Stack* initializeStack() {
+	struct Stack* newStack = (struct Stack*)malloc(sizeof(struct Stack));
+	if (newStack == NULL) {
+		printf("Error: Failed to allocate memory for new stack\n");
+		return NULL;
+	}
+
+	newStack->top = NULL;
+
+	return newStack;
+}
+
+/*
 * FUNCTION				: push
 * DESCRIPTION			:
 *	Pushes a new node onto the stack
 * PARAMETERS			:
 *   struct Stack* stack : The stack to push to
-*	char* str			: The url for the stack node
+*	char* newUrl		: The url for the stack node
 * RETURNS				:
 * 	void 	    		: No return value
 */
@@ -110,6 +131,32 @@ char* peek(struct Stack* stack) {
 }
 
 /*
+* FUNCTION				: freeStackNodes
+* DESCRIPTION			:
+*	Frees all memory within a stack
+* PARAMETERS			:
+*   struct Stack* stack : The stack to free
+* RETURNS				:
+*	void				: No return value
+*/
+void freeStackNodes(struct Stack* stack) {
+	if (isEmpty(stack)) {
+		return;
+	}
+
+	struct StackNode* current = stack->top;
+	while (current != NULL) {
+		struct StackNode* next = current->next;
+	
+		free(current);
+
+		current = next;
+	}
+
+	stack->top = NULL;
+}
+
+/*
 * FUNCTION		    : removeNewLine
 * DESCRIPTION		:
 *	Removes the first new line character from a string
@@ -137,15 +184,16 @@ void cleanInputBuffer() {
 }
 
 /*
-* FUNCTION		    : visitNewPage
-* DESCRIPTION		:
+* FUNCTION						: visitNewPage
+* DESCRIPTION					:
 *	Asks the user for the url of a new web page and adds it to history
-* PARAMETERS		:
-*	None
-* RETURNS		    :
-* 	void			: No return value
+* PARAMETERS					:
+*	struct Stack* backStack		: The stack to push onto
+*   struct Stack* forwardStack	: The stack to clear if needed
+* RETURNS						:
+* 	void						: No return value
 */
-void visitNewPage() {
+void visitNewPage(struct Stack* backStack, struct Stack* forwardStack) {
 	printf("Enter the URL you want to visit: ");
 
 	char urlBuffer[URL_MAX_LENGTH];
@@ -157,7 +205,84 @@ void visitNewPage() {
 		return;
 	}
 
+	push(backStack, urlBuffer);
+	printf("You are now viewing the site: %s\n", urlBuffer);
 
+	freeStackNodes(forwardStack);
+
+	/*struct StackNode* current = backStack->top;
+	while (current != NULL) {
+		printf("Test: %s\n", current->url);
+		current = current->next;
+	}*/
+}
+
+/*
+* FUNCTION						: viewBackward
+* DESCRIPTION					:
+*	Goes backward one url
+* PARAMETERS					:
+*	struct Stack* backStack		: The stack to pop off of
+*	struct Stack* forwardStack	: The stack to push onto
+* RETURNS						:
+* 	void						: No return value
+*/
+void viewBackward(struct Stack* backStack, struct Stack* forwardStack) {
+	if (isEmpty(backStack) || backStack->top->next == NULL) {
+		printf("You have returned to the start of the current urls\n");
+		return;
+	}
+
+	char* url = pop(backStack);
+	push(forwardStack, url);
+
+	printf("You are now viewing the page: %s\n", backStack->top->url);
+
+	free(url);
+}
+
+/*
+* FUNCTION						: viewForward
+* DESCRIPTION					:
+*	Goes forward one url
+* PARAMETERS					:
+*	struct Stack* backStack		: The stack to push onto
+*	struct Stack* forwardStack	: The stack to pop off of
+* RETURNS						:
+* 	void						: No return value
+*/
+void viewForward(struct Stack* backStack, struct Stack* forwardStack) {
+	if (isEmpty(forwardStack)) {
+		printf("You have reached the end of the current urls\n");
+		return;
+	}
+
+	char* url = pop(forwardStack);
+	push(backStack, url);
+
+	printf("You are now viewing the page: %s\n", backStack->top->url);
+
+	free(url);
+}
+
+/*
+* FUNCTION						: viewCurrent
+* DESCRIPTION					:
+*	Displays the current url
+* PARAMETERS					:
+*	struct Stack* backStack		: The stack containing the current page
+* RETURNS						:
+* 	void						: No return value
+*/
+void viewCurrent(struct Stack* backStack) {
+	if (isEmpty(backStack)) {
+		printf("You haven't viewed any pages yet\n");
+		return;
+	}
+
+	char* url = peek(backStack);
+
+	printf("You are currently viewing the page: %s\n", url);
 }
 
 /*
@@ -170,6 +295,9 @@ void visitNewPage() {
 * 	int 	    	: Whether the execution was successful
 */
 int main() {
+	struct Stack* backStack = initializeStack();
+	struct Stack* forwardStack = initializeStack();
+
 	bool running = true;
 	while (running) {
 		printf("----------------- Browser -----------------\n");
@@ -205,22 +333,28 @@ int main() {
 
 		switch (number) {
 			case 1:
-				visitNewPage();
+				visitNewPage(backStack, forwardStack);
 				break;
 			case 2:
-
+				viewBackward(backStack, forwardStack);
 				break;
 			case 3:
-
+				viewForward(backStack, forwardStack);
 				break;
 			case 4:
-
+				viewCurrent(backStack);
 				break;
 			case 5:
 
 				break;
 			case 6:
-				printf("Goodbye");
+				freeStackNodes(backStack);
+				freeStackNodes(forwardStack);
+
+				free(backStack);
+				free(forwardStack);
+
+				printf("Goodbye\n");
 				running = false;
 				break;
 			default:
