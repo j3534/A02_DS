@@ -26,6 +26,17 @@ struct Stack {
 	struct StackNode* top;
 };
 
+struct QueueNode {
+	char url[URL_MAX_LENGTH];
+
+	struct QueueNode* next;
+};
+
+struct Queue {
+	struct QueueNode* front;
+	struct QueueNode* rear;
+};
+
 /*
 * FUNCTION				: initializeStack
 * DESCRIPTION			:
@@ -45,6 +56,28 @@ struct Stack* initializeStack() {
 	newStack->top = NULL;
 
 	return newStack;
+}
+
+/*
+* FUNCTION				: initializeQueue
+* DESCRIPTION			:
+*	Creates a new queue
+* PARAMETERS			:
+*   None
+* RETURNS				:
+* 	struct Queue*  		: A pointer to the new queue
+*/
+struct Queue* initializeQueue() {
+	struct Queue* newQueue = (struct Queue*)malloc(sizeof(struct Queue));
+	if (newQueue == NULL) {
+		printf("Error: Failed to allocate memory for new queue\n");
+		return NULL;
+	}
+
+	newQueue->front = NULL;
+	newQueue->rear = NULL;
+
+	return newQueue;
 }
 
 /*
@@ -71,15 +104,15 @@ void push(struct Stack* stack, char* newUrl) {
 }
 
 /*
-* FUNCTION				: isEmpty
+* FUNCTION				: isStackEmpty
 * DESCRIPTION			:
-*	Checks if the stack is currently empty
+*	Checks if a stack is currently empty
 * PARAMETERS			:
 *   struct Stack* stack : The stack to check
 * RETURNS				:
 *	bool				: Whether the stack is empty
 */
-bool isEmpty(struct Stack* stack) {
+bool isStackEmpty(struct Stack* stack) {
 	return stack->top == NULL;
 }
 
@@ -93,7 +126,7 @@ bool isEmpty(struct Stack* stack) {
 *	char*				: The url of the top node
 */
 char* pop(struct Stack* stack) {
-	if (isEmpty(stack)) {
+	if (isStackEmpty(stack)) {
 		return NULL;
 	}
 
@@ -114,7 +147,7 @@ char* pop(struct Stack* stack) {
 }
 
 /*
-* FUNCTION				: peek
+* FUNCTION				: peekStack
 * DESCRIPTION			:
 *	Returns the url at the top of the stack
 * PARAMETERS			:
@@ -122,8 +155,8 @@ char* pop(struct Stack* stack) {
 * RETURNS				:
 *	char*				: The url of the top node
 */
-char* peek(struct Stack* stack) {
-	if (isEmpty(stack)) {
+char* peekStack(struct Stack* stack) {
+	if (isStackEmpty(stack)) {
 		return NULL;
 	}
 
@@ -140,7 +173,7 @@ char* peek(struct Stack* stack) {
 *	void				: No return value
 */
 void freeStackNodes(struct Stack* stack) {
-	if (isEmpty(stack)) {
+	if (isStackEmpty(stack)) {
 		return;
 	}
 
@@ -154,6 +187,100 @@ void freeStackNodes(struct Stack* stack) {
 	}
 
 	stack->top = NULL;
+}
+
+/*
+* FUNCTION				: isQueueEmpty
+* DESCRIPTION			:
+*	Checks if a queue is currently empty
+* PARAMETERS			:
+*   struct Queue* queue : The queue to check
+* RETURNS				:
+*	bool				: Whether the queue is empty
+*/
+bool isQueueEmpty(struct Queue* queue) {
+	return queue->front == NULL;
+}
+
+/*
+* FUNCTION				: enQueue
+* DESCRIPTION			:
+*	Adds an item to the back of the queue
+* PARAMETERS			:
+*   struct Queue* queue : The queue to add to
+*	char* newUrl		: The url for the queue node
+* RETURNS				:
+* 	void 	    		: No return value
+*/
+void enQueue(struct Queue* queue, char* newUrl) {
+	struct QueueNode* newNode = (struct QueueNode*)malloc(sizeof(struct QueueNode));
+	if (newNode == NULL) {
+		printf("Error: Failed to allocate memory for new node\n");
+		return;
+	}
+
+	newNode->next = NULL;
+	strcpy(newNode->url, newUrl);
+
+	if (isQueueEmpty(queue)) {
+		queue->front = newNode;
+		queue->rear = newNode;
+	}
+	else {
+		queue->rear->next = newNode;
+		queue->rear = newNode;
+	}
+}
+
+/*
+* FUNCTION				: deQueue
+* DESCRIPTION			:
+*	Removes an item from the front of the queue
+* PARAMETERS			:
+*   struct Queue* queue : The queue to remove from
+* RETURNS				:
+*	char*				: The url of the front queue node
+*/
+char* deQueue(struct Queue* queue) {
+	if (isQueueEmpty(queue)) {
+		return NULL;
+	}
+
+	char* urlBuffer = (char*)malloc(sizeof(char) * URL_MAX_LENGTH);
+	if (urlBuffer == NULL) {
+		printf("Error: Failed to allocate memory for url\n");
+		return NULL;
+	}
+
+	strcpy(urlBuffer, queue->front->url);
+
+	struct QueueNode* currentFront = queue->front;
+	queue->front = queue->front->next;
+
+	if (queue->rear == currentFront) {
+		queue->rear = NULL; // so that rear is not pointing to freed memory
+	}
+
+	free(currentFront);
+
+	return urlBuffer;
+}
+
+/*
+* FUNCTION				: peekQueue
+* DESCRIPTION			:
+*	Returns the url at the front of the queue
+* PARAMETERS			:
+*   struct Queue* queue : The queue to read from
+* RETURNS				:
+*	char*				: The url of the front queue node
+*/
+char* peekQueue(struct Queue* queue) {
+	if (isQueueEmpty(queue)) {
+		return NULL;
+	}
+
+	return queue->front->url;
 }
 
 /*
@@ -209,12 +336,6 @@ void visitNewPage(struct Stack* backStack, struct Stack* forwardStack) {
 	printf("You are now viewing the site: %s\n", urlBuffer);
 
 	freeStackNodes(forwardStack);
-
-	/*struct StackNode* current = backStack->top;
-	while (current != NULL) {
-		printf("Test: %s\n", current->url);
-		current = current->next;
-	}*/
 }
 
 /*
@@ -228,7 +349,7 @@ void visitNewPage(struct Stack* backStack, struct Stack* forwardStack) {
 * 	void						: No return value
 */
 void viewBackward(struct Stack* backStack, struct Stack* forwardStack) {
-	if (isEmpty(backStack) || backStack->top->next == NULL) {
+	if (isStackEmpty(backStack) || backStack->top->next == NULL) {
 		printf("You have returned to the start of the current urls\n");
 		return;
 	}
@@ -252,7 +373,7 @@ void viewBackward(struct Stack* backStack, struct Stack* forwardStack) {
 * 	void						: No return value
 */
 void viewForward(struct Stack* backStack, struct Stack* forwardStack) {
-	if (isEmpty(forwardStack)) {
+	if (isStackEmpty(forwardStack)) {
 		printf("You have reached the end of the current urls\n");
 		return;
 	}
@@ -275,12 +396,12 @@ void viewForward(struct Stack* backStack, struct Stack* forwardStack) {
 * 	void						: No return value
 */
 void viewCurrent(struct Stack* backStack) {
-	if (isEmpty(backStack)) {
+	if (isStackEmpty(backStack)) {
 		printf("You haven't viewed any pages yet\n");
 		return;
 	}
 
-	char* url = peek(backStack);
+	char* url = peekStack(backStack);
 
 	printf("You are currently viewing the page: %s\n", url);
 }
@@ -297,6 +418,7 @@ void viewCurrent(struct Stack* backStack) {
 int main() {
 	struct Stack* backStack = initializeStack();
 	struct Stack* forwardStack = initializeStack();
+	struct Queue* historyQueue = initializeQueue();
 
 	bool running = true;
 	while (running) {
