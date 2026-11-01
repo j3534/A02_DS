@@ -205,7 +205,7 @@ bool isQueueEmpty(struct Queue* queue) {
 /*
 * FUNCTION				: enQueue
 * DESCRIPTION			:
-*	Adds an item to the back of the queue
+*	Adds an item to the rear of the queue
 * PARAMETERS			:
 *   struct Queue* queue : The queue to add to
 *	char* newUrl		: The url for the queue node
@@ -284,6 +284,81 @@ char* peekQueue(struct Queue* queue) {
 }
 
 /*
+* FUNCTION				: freeQueueNodes
+* DESCRIPTION			:
+*	Frees all memory within a queue
+* PARAMETERS			:
+*   struct Queue* queue : The queue to free
+* RETURNS				:
+*	void				: No return value
+*/
+void freeQueueNodes(struct Queue* queue) {
+	if (isQueueEmpty(queue)) {
+		return;
+	}
+
+	struct QueueNode* current = queue->front;
+	while (current != NULL) {
+		struct QueueNode* next = current->next;
+
+		free(current);
+
+		current = next;
+	}
+
+	queue->front = NULL;
+	queue->rear = NULL;
+}
+
+/*
+* FUNCTION				: moveToQueueRear
+* DESCRIPTION			:
+*	Finds a url in the queue and moves it to the rear
+* PARAMETERS			:
+*   struct Queue* queue : The queue to read from
+*	char* url			: The url to find
+* RETURNS				:
+*	void				: No return value
+*/
+void moveToQueueRear(struct Queue* queue, char* url) {
+	if (isQueueEmpty(queue)) {
+		return;
+	}
+
+	// do nothing if the rear is the url
+	if (strcmp(queue->rear->url, url) == 0) {
+		return;
+	}
+	
+	if (strcmp(queue->front->url, url) == 0) {
+		// re-link to the back if front is the url
+		struct QueueNode* front = queue->front;
+
+		queue->front = front->next;
+
+		front->next = NULL;
+		queue->rear->next = front;
+		queue->rear = front;
+	}
+	else {
+		struct QueueNode* previous = NULL;
+		struct QueueNode* current = queue->front;
+
+		while (current != NULL && strcmp(url, current->url) != 0) {
+			previous = current;
+			current = current->next;
+		}
+
+		if (current != NULL) {
+			previous->next = current->next;
+			free(current);
+
+			enQueue(queue, url);
+		}
+	}
+}
+
+/*
 * FUNCTION		    : removeNewLine
 * DESCRIPTION		:
 *	Removes the first new line character from a string
@@ -317,10 +392,11 @@ void cleanInputBuffer() {
 * PARAMETERS					:
 *	struct Stack* backStack		: The stack to push onto
 *   struct Stack* forwardStack	: The stack to clear if needed
+*   struct Queue* historyQueue  : The queue for managing history
 * RETURNS						:
 * 	void						: No return value
 */
-void visitNewPage(struct Stack* backStack, struct Stack* forwardStack) {
+void visitNewPage(struct Stack* backStack, struct Stack* forwardStack, struct Queue* historyQueue) {
 	printf("Enter the URL you want to visit: ");
 
 	char urlBuffer[URL_MAX_LENGTH];
@@ -333,6 +409,8 @@ void visitNewPage(struct Stack* backStack, struct Stack* forwardStack) {
 	}
 
 	push(backStack, urlBuffer);
+	enQueue(historyQueue, urlBuffer);
+
 	printf("You are now viewing the site: %s\n", urlBuffer);
 
 	freeStackNodes(forwardStack);
@@ -345,10 +423,11 @@ void visitNewPage(struct Stack* backStack, struct Stack* forwardStack) {
 * PARAMETERS					:
 *	struct Stack* backStack		: The stack to pop off of
 *	struct Stack* forwardStack	: The stack to push onto
+*   struct Queue* historyQueue  : The queue for managing history
 * RETURNS						:
 * 	void						: No return value
 */
-void viewBackward(struct Stack* backStack, struct Stack* forwardStack) {
+void viewBackward(struct Stack* backStack, struct Stack* forwardStack, struct Queue* historyQueue) {
 	if (isStackEmpty(backStack) || backStack->top->next == NULL) {
 		printf("You have returned to the start of the current urls\n");
 		return;
@@ -360,6 +439,8 @@ void viewBackward(struct Stack* backStack, struct Stack* forwardStack) {
 	printf("You are now viewing the page: %s\n", backStack->top->url);
 
 	free(url);
+
+	moveToQueueRear(historyQueue, backStack->top->url);
 }
 
 /*
@@ -369,10 +450,11 @@ void viewBackward(struct Stack* backStack, struct Stack* forwardStack) {
 * PARAMETERS					:
 *	struct Stack* backStack		: The stack to push onto
 *	struct Stack* forwardStack	: The stack to pop off of
+*   struct Queue* historyQueue  : The queue for managing history
 * RETURNS						:
 * 	void						: No return value
 */
-void viewForward(struct Stack* backStack, struct Stack* forwardStack) {
+void viewForward(struct Stack* backStack, struct Stack* forwardStack, struct Queue* historyQueue) {
 	if (isStackEmpty(forwardStack)) {
 		printf("You have reached the end of the current urls\n");
 		return;
@@ -384,6 +466,8 @@ void viewForward(struct Stack* backStack, struct Stack* forwardStack) {
 	printf("You are now viewing the page: %s\n", backStack->top->url);
 
 	free(url);
+
+	moveToQueueRear(historyQueue, backStack->top->url);
 }
 
 /*
@@ -404,6 +488,33 @@ void viewCurrent(struct Stack* backStack) {
 	char* url = peekStack(backStack);
 
 	printf("You are currently viewing the page: %s\n", url);
+}
+
+/*
+* FUNCTION						: viewHistory
+* DESCRIPTION					:
+*	Displays the history of urls
+* PARAMETERS					:
+*	struct Queue* historyQueue	: The queue containing the history of past urls
+* RETURNS						:
+* 	void						: No return value
+*/
+void viewHistory(struct Queue* historyQueue) {
+	if (isQueueEmpty(historyQueue)) {
+		printf("You haven't viewed any pages yet\n");
+		return;
+	}
+
+	int urls = 1;
+	printf("Current history:\n");
+
+	struct QueueNode* current = historyQueue->front;
+	while (current != NULL) {
+		printf("%d. %s\n", urls, current->url);
+
+		urls++;
+		current = current->next;
+	}
 }
 
 /*
@@ -455,26 +566,28 @@ int main() {
 
 		switch (number) {
 			case 1:
-				visitNewPage(backStack, forwardStack);
+				visitNewPage(backStack, forwardStack, historyQueue);
 				break;
 			case 2:
-				viewBackward(backStack, forwardStack);
+				viewBackward(backStack, forwardStack, historyQueue);
 				break;
 			case 3:
-				viewForward(backStack, forwardStack);
+				viewForward(backStack, forwardStack, historyQueue);
 				break;
 			case 4:
 				viewCurrent(backStack);
 				break;
 			case 5:
-
+				viewHistory(historyQueue);
 				break;
 			case 6:
 				freeStackNodes(backStack);
 				freeStackNodes(forwardStack);
+				freeQueueNodes(historyQueue);
 
 				free(backStack);
 				free(forwardStack);
+				free(historyQueue);
 
 				printf("Goodbye\n");
 				running = false;
